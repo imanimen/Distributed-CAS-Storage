@@ -6,6 +6,24 @@ import (
 	"sync"
 )
 
+// TCPPeer represents the remote node over a TCP
+// established connection.
+type TCPPeer struct {
+	// conn is underlying connection of the peer
+	conn net.Conn
+
+	// if we dial a connection -> outbound == true
+	// if we accept and retrieve a connection -> outbound == false (inbound)
+	outbound bool
+}
+
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
+	return &TCPPeer{
+		conn:     conn,
+		outbound: outbound,
+	}
+}
+
 type TCPTransport struct {
 	listenAddress string
 	listener      net.Listener
@@ -43,5 +61,6 @@ func (t *TCPTransport) acceptor() {
 }
 
 func (t *TCPTransport) connector(conn net.Conn) {
-	fmt.Printf("New incoming connection %+v\n", conn)
+	peer := NewTCPPeer(conn, true)
+	fmt.Printf("New incoming connection %+v\n", peer)
 }
