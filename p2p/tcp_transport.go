@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"sync"
@@ -37,7 +36,7 @@ type TCPTransport struct {
 
 func NewTCPTransport(listenAddr string) *TCPTransport {
 	return &TCPTransport{
-		handShakeFunc: NOPHandshakeFunc,
+		shakeHands:    NOPHandshakeFunc,
 		listenAddress: listenAddr,
 	}
 }
