@@ -34,6 +34,8 @@ type TCPTransport struct {
 	peers map[net.Addr]Peer
 }
 
+type Temp struct{}
+
 func NewTCPTransport(listenAddr string) *TCPTransport {
 	return &TCPTransport{
 		shakeHands:    NOPHandshakeFunc,
@@ -59,6 +61,8 @@ func (t *TCPTransport) acceptor() {
 		if err != nil {
 			fmt.Printf("TCP listener accept error: %v\n", err)
 		}
+		fmt.Printf("New incoming connection %+v\n", conn)
+
 		go t.connector(conn)
 	}
 }
@@ -66,17 +70,16 @@ func (t *TCPTransport) acceptor() {
 func (t *TCPTransport) connector(conn net.Conn) {
 	peer := NewTCPPeer(conn, true)
 
-	if err := t.shakeHands(conn); err != nil {
+	if err := t.shakeHands(peer); err != nil {
 		fmt.Printf("TCP handshake error: %v\n", err)
 	}
 
 	// read loop
+	msg := &Temp{}
 	for {
-		err := t.decoder.Decode(conn, peer)
-		if err != nil {
-			return
+		if err := t.decoder.Decode(conn, msg); err != nil {
+			fmt.Printf("TCP error: %s\n", err)
 		}
 	}
 
-	fmt.Printf("New incoming connection %+v\n", peer)
 }
