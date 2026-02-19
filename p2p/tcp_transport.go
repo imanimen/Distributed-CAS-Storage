@@ -17,6 +17,12 @@ type TCPPeer struct {
 	outbound bool
 }
 
+type TCPTransportOption struct {
+	ListenAddr    string
+	HandshakeFunc HandshakeFunc
+	Decoder       Decoder
+}
+
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		conn:     conn,
@@ -25,6 +31,7 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 }
 
 type TCPTransport struct {
+	TCPTransportOption
 	listenAddress string
 	listener      net.Listener
 	shakeHands    HandshakeFunc
@@ -36,10 +43,10 @@ type TCPTransport struct {
 
 type Temp struct{}
 
-func NewTCPTransport(listenAddr string) *TCPTransport {
+func NewTCPTransport(options TCPTransportOption) *TCPTransport {
 	return &TCPTransport{
-		shakeHands:    NOPHandshakeFunc,
-		listenAddress: listenAddr,
+		shakeHands:    options.HandshakeFunc,
+		listenAddress: options.ListenAddr,
 	}
 }
 
@@ -67,18 +74,24 @@ func (t *TCPTransport) acceptor() {
 	}
 }
 
-func (t *TCPTransport) connector(conn net.Conn) {
+func (t *TCPTransport) connector(conn net.Conn) error {
 	peer := NewTCPPeer(conn, true)
 
-	if err := t.shakeHands(peer); err != nil {
+	if err := t.HandshakeFunc(peer); err != nil {
 		fmt.Printf("TCP handshake error: %v\n", err)
+		err := conn.Close()
+		if err != nil {
+			return err
+		}
+		return ErrInvalidHandShake
 	}
 
 	// read loop
 	msg := &Temp{}
 	for {
-		if err := t.decoder.Decode(conn, msg); err != nil {
+		if err := t.Decoder.Decode(conn, msg); err != nil {
 			fmt.Printf("TCP error: %s\n", err)
+			continue
 		}
 	}
 
