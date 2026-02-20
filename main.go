@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/imanimen/cas/p2p"
@@ -17,6 +18,13 @@ func main() {
 	if err := tr.ListenAndAccept(); err != nil {
 		log.Fatal(err)
 	}
+
+	go func() {
+		for {
+			message := <-tr.Consume()
+			fmt.Printf("Message: %v\n", message)
+		}
+	}()
 
 	select {}
 }
