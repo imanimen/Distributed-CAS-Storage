@@ -104,3 +104,32 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 
 	return nil
 }
+
+func (s *Store) Delete(key string) error {
+	pathKey := s.PathTransformFunc(key)
+	defer func() {
+		log.Printf("deleting [%s]", pathKey.FileName)
+	}()
+	if err := os.RemoveAll(pathKey.FullPath()); err != nil {
+		return err
+	}
+	return os.RemoveAll(pathKey.FirstPathName())
+}
+
+func (s *Store) Exists(key string) bool {
+	pathKey := s.PathTransformFunc(key)
+	_, err := os.Stat(pathKey.FullPath())
+	if err != nil {
+		return false
+	}
+	return true
+
+}
+
+func (p PathKey) FirstPathName() string {
+	paths := strings.Split(p.PathName, "/")
+	if len(paths) == 0 {
+		panic("empty path name")
+	}
+	return paths[0]
+}

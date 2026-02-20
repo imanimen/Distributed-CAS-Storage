@@ -44,4 +44,6 @@ func TestStore(t *testing.T) {
 	if string(b) != string(data) {
 		t.Errorf("readStream returns %s, but expected %s", b, data)
 	}
+
+	store.Delete(key)
 }
