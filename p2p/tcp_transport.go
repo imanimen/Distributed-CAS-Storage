@@ -21,6 +21,7 @@ type TCPTransportOption struct {
 	ListenAddr    string
 	HandshakeFunc HandshakeFunc
 	Decoder       Decoder
+	OnPeer        func(Peer) error
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
@@ -85,12 +86,26 @@ func (t *TCPTransport) acceptor() {
 }
 
 func (t *TCPTransport) connector(conn net.Conn) {
+	var err error
+
+	defer func() {
+		fmt.Printf("Dropping connection %s\n", err)
+		err = conn.Close()
+		if err != nil {
+			fmt.Printf("Error closing connection: %v\n", err)
+		}
+	}()
+
 	peer := NewTCPPeer(conn, true)
 
 	if err := t.HandshakeFunc(peer); err != nil {
-		fmt.Printf("TCP handshake error: %v\n", err)
-		conn.Close()
 		return
+	}
+
+	if t.OnPeer != nil {
+		if err = t.OnPeer(peer); err != nil {
+			return
+		}
 	}
 
 	// read loop

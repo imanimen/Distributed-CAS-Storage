@@ -12,6 +12,9 @@ func main() {
 		ListenAddr:    ":3000",
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
+		OnPeer: func(peer p2p.Peer) error {
+			return fmt.Errorf("failed to on peer func %v\n", peer)
+		},
 	}
 	tr := p2p.NewTCPTransport(tcpOptions)
 
