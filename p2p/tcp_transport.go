@@ -92,7 +92,10 @@ func (t *TCPTransport) connector(conn net.Conn) {
 			fmt.Printf("TCP error: %s\n", err)
 			continue
 		}
+
+		msg.From = conn.RemoteAddr()
 		fmt.Printf("message: %+v\n", msg)
+		fmt.Printf("from: %+v\n", msg.From)
 	}
 
 }
