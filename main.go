@@ -7,14 +7,17 @@ import (
 	"github.com/imanimen/cas/p2p"
 )
 
+func OnPeer(peer p2p.Peer) error {
+	fmt.Printf("OnPeer %s\n", peer) // todo: chang
+	return nil
+}
+
 func main() {
 	tcpOptions := p2p.TCPTransportOption{
 		ListenAddr:    ":3000",
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
-		OnPeer: func(peer p2p.Peer) error {
-			return fmt.Errorf("failed to on peer func %v\n", peer)
-		},
+		OnPeer:        OnPeer,
 	}
 	tr := p2p.NewTCPTransport(tcpOptions)
 
