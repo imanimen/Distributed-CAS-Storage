@@ -89,11 +89,8 @@ func (t *TCPTransport) connector(conn net.Conn) {
 	var err error
 
 	defer func() {
-		fmt.Printf("Dropping connection %s\n", err)
-		err = conn.Close()
-		if err != nil {
-			fmt.Printf("Error closing connection: %v\n", err)
-		}
+		fmt.Printf("Dropping connection %s", err)
+		conn.Close()
 	}()
 
 	peer := NewTCPPeer(conn, true)
@@ -111,9 +108,10 @@ func (t *TCPTransport) connector(conn net.Conn) {
 	// read loop
 	rpc := RPC{}
 	for {
-		if err := t.Decoder.Decode(conn, &rpc); err != nil {
+		err := t.Decoder.Decode(conn, &rpc)
+		if err != nil {
 			fmt.Printf("TCP error: %s\n", err)
-			continue
+			return
 		}
 
 		rpc.From = conn.RemoteAddr()

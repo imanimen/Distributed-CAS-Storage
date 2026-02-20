@@ -8,7 +8,7 @@ import (
 )
 
 func OnPeer(peer p2p.Peer) error {
-	fmt.Printf("OnPeer %s\n", peer) // todo: chang
+	fmt.Printf("OnPeer %v\n", peer) // todo: chang
 	return nil
 }
 
