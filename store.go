@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const DefaultRootFolderName = "casnetwork"
+
 func CASPathTransformFunc(key string) PathKey {
 	hash := sha1.Sum([]byte(key)) // [20] byte -> []byte -> [:] (to be slice)
 
@@ -40,11 +42,16 @@ type PathKey struct {
 }
 
 type StoreOptions struct {
+	// Root is the folder name of the root, containing all the files/folders of the system
+	Root              string
 	PathTransformFunc PathTransformFunc
 }
 
-var DefaultPathTransformFunc = func(key string) string {
-	return key
+var DefaultPathTransformFunc = func(key string) PathKey {
+	return PathKey{
+		PathName: key,
+		FileName: key,
+	}
 }
 
 type Store struct {
@@ -52,6 +59,12 @@ type Store struct {
 }
 
 func NewStore(options StoreOptions) *Store {
+	if options.PathTransformFunc == nil {
+		options.PathTransformFunc = DefaultPathTransformFunc
+	}
+	if len(options.Root) == 0 {
+		options.Root = DefaultRootFolderName
+	}
 	return &Store{
 		StoreOptions: options,
 	}
@@ -83,13 +96,13 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 func (s *Store) writeStream(key string, r io.Reader) error {
 	pathKey := s.PathTransformFunc(key)
 
-	if err := os.MkdirAll(pathKey.PathName, os.ModePerm); err != nil {
+	if err := os.MkdirAll(s.Root+"/"+pathKey.PathName, os.ModePerm); err != nil {
 		return err
 	}
 
 	fullPath := pathKey.FullPath()
 
-	f, err := os.Create(fullPath)
+	f, err := os.Create(s.Root + "/" + fullPath)
 
 	if err != nil {
 		return err
