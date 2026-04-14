@@ -2,10 +2,9 @@ package p2p
 
 import "net"
 
-// RPC holds any arbitrary data that is being sent over the
-//
-//	transport between two nodes in the network
+// RPC represents a remote procedure call message sent between nodes in the network.
+// It contains the source address and the payload data.
 type RPC struct {
-	From    net.Addr
-	Payload []byte
+	From    net.Addr // The network address of the sender
+	Payload []byte   // The message payload/data
 }

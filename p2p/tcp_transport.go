@@ -24,6 +24,9 @@ type TCPTransportOption struct {
 	OnPeer        func(Peer) error
 }
 
+// NewTCPPeer creates a new TCPPeer with the given connection.
+// The outbound parameter indicates whether this peer initiated the connection (true)
+// or accepted it (false).
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		conn:     conn,
@@ -42,6 +45,7 @@ type TCPTransport struct {
 
 type Temp struct{}
 
+// NewTCPTransport creates a new TCPTransport with the given options.
 func NewTCPTransport(options TCPTransportOption) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOption: options,
@@ -49,6 +53,9 @@ func NewTCPTransport(options TCPTransportOption) *TCPTransport {
 	}
 }
 
+// ListenAndAccept starts the TCP listener on the configured address
+// and begins accepting incoming connections in a goroutine.
+// It returns an error if the listener fails to start.
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 
@@ -61,18 +68,19 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
-// Close implements the Peer interface
+// Close closes the underlying TCP connection for this peer.
 func (p *TCPPeer) Close() error {
 	return p.conn.Close()
 }
 
-// Consume implements the Transport Interface
-// which will return read-only channel for reading the incoming new message received from
-// another Peer in the network
+// Consume returns a read-only channel that receives incoming RPC messages
+// from remote peers in the network.
 func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcChan
 }
 
+// acceptor runs in a goroutine and accepts incoming TCP connections.
+// For each new connection, it spawns a connector goroutine to handle the peer.
 func (t *TCPTransport) acceptor() {
 	for {
 		conn, err := t.listener.Accept()
@@ -85,6 +93,9 @@ func (t *TCPTransport) acceptor() {
 	}
 }
 
+// connector handles an established TCP connection from a remote peer.
+// It performs the handshake, invokes the OnPeer callback, and starts
+// reading incoming RPC messages in a loop.
 func (t *TCPTransport) connector(conn net.Conn) {
 	var err error
 

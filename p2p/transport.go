@@ -1,12 +1,15 @@
 package p2p
 
-// Peer is and interface that represents the remote node.
+// Peer represents a remote node in the P2P network.
+// It provides an interface for closing the connection to the peer.
 type Peer interface {
 	Close() error
 }
 
-// Transport is anything that handles the communication between
-// the nodes in the network. This can be of the form (TCP, UDP, WS, ...)
+// Transport is an interface for network communication between nodes.
+// Implementations handle the specific protocol (TCP, UDP, WebSocket, etc.).
+// ListenAndAccept starts listening for incoming connections.
+// Consume returns a channel for receiving incoming RPC messages from peers.
 type Transport interface {
 	ListenAndAccept() error
 	Consume() chan<- RPC

@@ -12,8 +12,12 @@ import (
 	"strings"
 )
 
+// DefaultRootFolderName is the default folder name for the CAS storage root directory.
 const DefaultRootFolderName = "casnetwork"
 
+// CASPathTransformFunc transforms a key into a PathKey by hashing the key
+// and splitting the hash into path segments of 5 characters each.
+// This creates a hierarchical directory structure for storing files.
 func CASPathTransformFunc(key string) PathKey {
 	hash := sha1.Sum([]byte(key)) // [20] byte -> []byte -> [:] (to be slice)
 
@@ -35,8 +39,13 @@ func CASPathTransformFunc(key string) PathKey {
 	}
 }
 
+// PathTransformFunc is a function type that transforms a string key into a PathKey.
+// It is used to determine the file path for storing data in the CAS system.
 type PathTransformFunc func(string) PathKey
 
+// PathKey represents the result of transforming a key into a file path.
+// PathName is the hierarchical directory path (e.g., "68044/29f74/181a6")
+// FileName is the full filename (e.g., the full hash string).
 type PathKey struct {
 	PathName string
 	FileName string
@@ -48,6 +57,8 @@ type StoreOptions struct {
 	PathTransformFunc PathTransformFunc
 }
 
+// DefaultPathTransformFunc is the default path transformation function.
+// It returns the key as both the path name and file name without any transformation.
 var DefaultPathTransformFunc = func(key string) PathKey {
 	return PathKey{
 		PathName: key,
@@ -55,10 +66,15 @@ var DefaultPathTransformFunc = func(key string) PathKey {
 	}
 }
 
+// Store is the content-addressable storage system that handles reading,
+// writing, and deleting files based on keys.
 type Store struct {
 	StoreOptions
 }
 
+// NewStore creates a new Store with the given options.
+// If PathTransformFunc is not provided, it defaults to DefaultPathTransformFunc.
+// If Root is not provided, it defaults to DefaultRootFolderName.
 func NewStore(options StoreOptions) *Store {
 	if options.PathTransformFunc == nil {
 		options.PathTransformFunc = DefaultPathTransformFunc
@@ -71,10 +87,14 @@ func NewStore(options StoreOptions) *Store {
 	}
 }
 
+// FullPath returns the full path by joining PathName and FileName with a "/".
 func (p PathKey) FullPath() string {
 	return fmt.Sprintf("%s/%s", p.PathName, p.FileName)
 }
 
+// Read retrieves data from the store by key.
+// It returns an io.Reader that can be used to read the data.
+// The caller must close the reader after use to release resources.
 func (s *Store) Read(key string) (io.Reader, error) {
 
 	f, err := s.readStream(key)
@@ -89,12 +109,15 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	return buf, err
 }
 
+// readStream returns an io.ReadCloser for the file associated with the key.
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	pathKey := s.PathTransformFunc(key)
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 	return os.Open(fullPathWithRoot)
 }
 
+// writeStream writes data from an io.Reader to the store using the given key.
+// It creates the necessary directory structure and file if they don't exist.
 func (s *Store) writeStream(key string, r io.Reader) error {
 	pathKey := s.PathTransformFunc(key)
 
@@ -123,6 +146,7 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	return nil
 }
 
+// Delete removes the file and directory associated with the key from the store.
 func (s *Store) Delete(key string) error {
 	pathKey := s.PathTransformFunc(key)
 	defer func() {
@@ -134,6 +158,8 @@ func (s *Store) Delete(key string) error {
 	return os.RemoveAll(pathKey.FirstPathName())
 }
 
+// Exists checks whether a file exists in the store for the given key.
+// It returns true if the file exists, false otherwise.
 func (s *Store) Exists(key string) bool {
 	pathKey := s.PathTransformFunc(key)
 	_, err := os.Stat(pathKey.FullPath())
@@ -146,6 +172,8 @@ func (s *Store) Exists(key string) bool {
 
 }
 
+// FirstPathName returns the first directory name in the hierarchical path.
+// For example, for path "68044/29f74/181a6", it returns "68044".
 func (p PathKey) FirstPathName() string {
 	paths := strings.Split(p.PathName, "/")
 	if len(paths) == 0 {
