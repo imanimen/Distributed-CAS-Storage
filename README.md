@@ -8,21 +8,52 @@ A distributed peer-to-peer file storage system written in Go. Files are stored u
 - **P2P Networking** - TCP-based transport with pluggable handshake and message encoding
 - **Streaming I/O** - Read and write files via Go's `io.Reader`/`io.Writer` interfaces
 - **Extensible Encoding** - Ships with a raw byte decoder (`DefaultDecoder`) and a GOB decoder (`GOBDecoder`)
+- **Pluggable Handshake** - Custom handshake functions for peer validation
 
 ## Architecture
 
 ```
-main.go                       Entry point - wires transport + store
-│
-├── store.go                  CAS storage engine (core)
-│   └── PathTransformFunc     SHA1 key → nested directory path
-│
-└── p2p/                      Networking layer
-    ├── transport.go          Peer & Transport interfaces
-    ├── tcp_transport.go      TCP implementation
-    ├── message.go            RPC message struct
-    ├── encoding.go           Decoder interface + implementations
-    └── handshaker.go         Handshake function types
+┌─────────────────────────────────────────────────────────────┐
+│                         main.go                             │
+│              (Entry Point - initializes P2P)               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       p2p/ (Networking Layer)                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   Peer      │  │  Transport  │  │      RPC            │  │
+│  │  interface  │  │  interface  │  │   (message struct)  │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+│         │                │                    │              │
+│         ▼                ▼                    ▼              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │                 tcp_transport.go                      │  │
+│  │   TCPPeer ←── TCPTransport ←── TCPTransportOption    │  │
+│  └──────────────────────────────────────────────────────┘  │
+│         │                │                    │              │
+│         ▼                ▼                    ▼              │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
+│  │handshaker.go│ │ encoding.go │ │     message.go      │   │
+│  │HandshakeFunc│ │  Decoder    │ │  RPC{From,Payload}  │   │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       store.go (Storage Layer)                │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │  Store                                                │   │
+│  │  - Root: "casnetwork" (default)                      │   │
+│  │  - PathTransformFunc: SHA1-based hierarchy          │   │
+│  │                                                      │   │
+│  │  Methods:                                             │   │
+│  │  - Read(key) → io.Reader                             │   │
+│  │  - writeStream(key, io.Reader)                       │   │
+│  │  - Delete(key)                                       │   │
+│  │  - Exists(key) → bool                                │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## How CAS Path Transform Works
@@ -35,7 +66,7 @@ A key is hashed with SHA1, and the hex digest is split into 5-character segments
   → Path: 68044/29f74/181a6/3c50c/3d81d/733a1/2f14a/353ff
 ```
 
-This distributes files across directories to avoid filesystem bottlenecks.
+This distributes files across directories to avoid filesystem bottlenecks and enables content-based deduplication.
 
 ## Getting Started
 
@@ -68,53 +99,85 @@ echo "hello" | nc localhost 3000
 ### P2P Transport
 
 ```go
-tcpOptions := p2p.TCPTransportOption{
-    ListenAddr:    ":3000",
-    HandshakeFunc: p2p.NOPHandshakeFunc,
-    Decoder:       p2p.DefaultDecoder{},
-    OnPeer: func(peer p2p.Peer) error {
-        fmt.Printf("peer connected: %v\n", peer)
-        return nil
-    },
-}
-tr := p2p.NewTCPTransport(tcpOptions)
-tr.ListenAndAccept()
+package main
 
-// read incoming messages
-for msg := range tr.Consume() {
-    fmt.Printf("%s: %s\n", msg.From, msg.Payload)
+import (
+    "fmt"
+    "log"
+
+    "github.com/imanimen/cas/p2p"
+)
+
+func OnPeer(peer p2p.Peer) error {
+    fmt.Printf("peer connected: %v\n", peer)
+    return nil
+}
+
+func main() {
+    tcpOptions := p2p.TCPTransportOption{
+        ListenAddr:    ":3000",
+        HandshakeFunc: p2p.NOPHandshakeFunc,
+        Decoder:       p2p.DefaultDecoder{},
+        OnPeer:        OnPeer,
+    }
+    tr := p2p.NewTCPTransport(tcpOptions)
+    
+    if err := tr.ListenAndAccept(); err != nil {
+        log.Fatal(err)
+    }
+
+    // read incoming messages
+    for msg := range tr.Consume() {
+        fmt.Printf("%s: %s\n", msg.From, msg.Payload)
+    }
 }
 ```
 
 ### Content-Addressable Store
 
 ```go
-store := NewStore(StoreOptions{
-    Root:              "mydata",
-    PathTransformFunc: CASPathTransformFunc,
-})
+package main
 
-// write
-store.writeStream("photo.jpg", bytes.NewReader(data))
+import (
+    "bytes"
+    "fmt"
+)
 
-// read
-reader, _ := store.Read("photo.jpg")
+func main() {
+    store := NewStore(StoreOptions{
+        Root:              "mydata",
+        PathTransformFunc: CASPathTransformFunc,
+    })
 
-// check existence
-store.Exists("photo.jpg")
+    data := []byte("hello world")
 
-// delete
-store.Delete("photo.jpg")
+    // write
+    if err := store.writeStream("myfile.txt", bytes.NewReader(data)); err != nil {
+        fmt.Println("Error:", err)
+    }
+
+    // read
+    reader, _ := store.Read("myfile.txt")
+    fmt.Println("Content:", reader)
+
+    // check existence
+    fmt.Println("Exists:", store.Exists("myfile.txt"))
+
+    // delete
+    store.Delete("myfile.txt")
+}
 ```
 
 ## Project Structure
 
 ```
 .
-├── main.go               Application entry point
-├── store.go              CAS storage engine
-├── store_test.go         Storage tests
-├── Makefile              Build/run/test targets
+├── main.go                   Application entry point
+├── store.go                  CAS storage engine
+├── store_test.go             Storage tests
+├── README.md                 Project documentation
+├── DOCUMENTATION.md          Detailed documentation
+├── Makefile                  Build/run/test targets
 ├── go.mod
 ├── go.sum
 └── p2p/
@@ -122,8 +185,32 @@ store.Delete("photo.jpg")
     ├── tcp_transport.go      TCPPeer, TCPTransport, connection lifecycle
     ├── tcp_transport_test.go Transport tests
     ├── message.go            RPC struct (From, Payload)
-    ├── encoding.go           DefaultDecoder (raw bytes), GOBDecoder
-    └── handshaker.go         HandshakeFunc, NOPHandshakeFunc
+    ├── encoding.go           Decoder interface: DefaultDecoder, GOBDecoder
+    └── handshaker.go         HandshakeFunc, NOPHandshakeFunc, ErrInvalidHandShake
+```
+
+## Core Interfaces
+
+### Peer Interface
+```go
+type Peer interface {
+    Close() error
+}
+```
+
+### Transport Interface
+```go
+type Transport interface {
+    ListenAndAccept() error
+    Consume() chan<- RPC
+}
+```
+
+### Decoder Interface
+```go
+type Decoder interface {
+    Decode(io.Reader, *RPC) error
+}
 ```
 
 ## License
