@@ -34,6 +34,10 @@ func TestStore(t *testing.T) {
 		t.Error(err)
 	}
 
+	if ok := store.Exists(key); !ok {
+		t.Errorf("Expected to have key %s", key)
+	}
+
 	r, err := store.Read(key)
 	if err != nil {
 		t.Error(err)

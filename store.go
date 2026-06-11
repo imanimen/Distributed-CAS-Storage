@@ -165,7 +165,8 @@ func (s *Store) Delete(key string) error {
 // It returns true if the file exists, false otherwise.
 func (s *Store) Exists(key string) bool {
 	pathKey := s.PathTransformFunc(key)
-	_, err := os.Stat(pathKey.FullPath())
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
+	_, err := os.Stat(fullPathWithRoot)
 	if errors.Is(err, os.ErrNotExist) {
 		return false
 
