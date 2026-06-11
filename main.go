@@ -10,7 +10,7 @@ import (
 // OnPeer is a callback function that is invoked when a new peer connects.
 // It receives the peer and can return an error to reject the connection.
 func OnPeer(peer p2p.Peer) error {
-	fmt.Printf("OnPeer %v\n", peer) // todo: chang
+	fmt.Printf("OnPeer %v\n", peer) // todo: change
 	return nil
 }
 

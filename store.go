@@ -120,9 +120,7 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 // It creates the necessary directory structure and file if they don't exist.
 func (s *Store) writeStream(key string, r io.Reader) error {
 	pathKey := s.PathTransformFunc(key)
-
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.PathName)
-
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
 		return err
 	}
@@ -152,9 +150,14 @@ func (s *Store) Delete(key string) error {
 	defer func() {
 		log.Printf("deleting [%s]", pathKey.FileName)
 	}()
-	if err := os.RemoveAll(pathKey.FullPath()); err != nil {
-		return err
-	}
+
+	firstPathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FirstPathName())
+
+	return os.RemoveAll(firstPathNameWithRoot)
+
+	//if err := os.RemoveAll(pathKey.FullPath()); err != nil {
+	//	return err
+	//}
 	return os.RemoveAll(pathKey.FirstPathName())
 }
 

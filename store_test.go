@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 )
 
@@ -39,11 +39,11 @@ func TestStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	b, err := ioutil.ReadAll(r)
-	fmt.Println(string(b))
+	b, err := io.ReadAll(r)
 	if string(b) != string(data) {
 		t.Errorf("readStream returns %s, but expected %s", b, data)
 	}
 
-	//store.Delete(key)
+	//fmt.Println(string(b))
+	store.Delete(key)
 }
